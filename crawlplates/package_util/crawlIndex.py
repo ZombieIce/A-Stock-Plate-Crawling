@@ -30,11 +30,13 @@ class CrawlIndex:
             print(filePath + " does not exist!")
             return None
 
+    # get plates codes list from local json file
     def __plateCodeList(self):
         carePlates = self.__getPlateCode(True)
         normalPlates = self.__getPlateCode(False)
         return list(carePlates.keys()) + list(normalPlates.keys())
 
+    # write data into file
     def __toFile(self, code, new_df):
         fileName = str(code) + ".csv"
         filePath = Path(self.__basePath + "/plateData/" + fileName)
@@ -43,6 +45,7 @@ class CrawlIndex:
         else:
             new_df.to_csv(filePath, index=None)
 
+    # crawl single plate
     def __crawlOnePlate(self, code):
         parameters = {"c": "PCArrangeData", "a": "GetZSHQPlate", "StockID": code, "PStockID": code, "SelType": "4,1,5",
                     "UserID": 862892, "Token": "8050e575cf13c8c5a108fbfa4e616d32"}
@@ -55,6 +58,7 @@ class CrawlIndex:
             new_df = pd.DataFrame()
         return new_df
 
+    # crawl all plates
     def crawlAllPlatesData(self):
         plateList = self.__plateCodeList()
         dirPath = self.__basePath + "/plateData"
