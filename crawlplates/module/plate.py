@@ -7,7 +7,7 @@ class Plate:
     def __init__(self):
         self.__fileBasePath = str(os.path.abspath('.')) + '/Data'
         
-    def getFileBasePath(self):
+    def __getFileBasePath(self):
         return self.__fileBasePath
     
     def setFileBasePath(self, p):

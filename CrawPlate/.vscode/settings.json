@@ -1,5 +1,0 @@
-{
-    "python.linting.pylintPath": "/Users/zhangyibin/anaconda3/lib/python3.7/site-packages/pylint",
-    "python.linting.pylintEnabled": true,
-    "python.linting.enabled": true
-}
