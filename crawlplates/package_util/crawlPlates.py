@@ -5,37 +5,37 @@ import datetime
 import sys
 import os
 from pathlib import Path
-from ..package_util.formatUtil import stocksToJson, platesToJson, visualTool
+from ..package_util.formatUtil import stocksToJson, platesToJson
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 class CrawlPlates:
     def __init__(self, stockSymbols, stockNames):
         self.__stockSymbols = stockSymbols
         self.__stockNames = stockNames
-        self.__baseURL = "https://pchq.kaipanla.com/w1/api/index.php"
+        self.baseURL = "https://pchq.kaipanla.com/w1/api/index.php"
         self.__basePath = str(os.path.abspath('.')) + '/Data'
         self.__failedStocks = {}
 
-    # custom storage direction
     def setBasePath(self, p):
         self.__basePath = p
     
-    # crawl script baisc parameter
     def __parameterSettings(self, stockSymbol):
         parameters = {"c": "PCArrangeData", "a": "GetHQPlate", "StockID": stockSymbol, "SelType": "1,2,3,8,9",
                     "UserID": 862892, "Token": "8050e575cf13c8c5a108fbfa4e616d32", "Time":"09:30"}
         return parameters
 
-    # crawl single stock to get normal plates and care plates
     def __crawlOneStockData(self, stockSymbol, stockName):
         date = ''.join(str(datetime.date.today()).split('-'))
         para = self.__parameterSettings(stockSymbol)
         para['Day'] = date
 
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
         normalPlate = {"status": 200}
         carePlate = {"status": 200}
 
         try:
-            with requests.post(self.__baseURL, para, stream=True) as req:
+            with requests.post(self.baseURL, para, stream=True, verify=False) as req:
                 data = req.json()
                 
                 normalPlateData = data['stockplate']
@@ -52,37 +52,10 @@ class CrawlPlates:
                 else:
                     for cp in carePlateData:
                         carePlate[cp[-1]] = cp[0]
-        except Exception:
+        except Exception as e:
             self.__failedStocks[stockSymbol] = stockName
 
         return normalPlate, carePlate
-
-    # divide data into three storage format
-    def __classifyCrawlData(self, symbol, name, cts, nts, stp):
-        st = Stock(symbol, name)
-        np, cp = self.__crawlOneStockData(symbol, name)
-        self.__classifyHelper(np, st, nts, False)
-        self.__classifyHelper(cp, st, cts, True)
-        stp[symbol] = st.formatPlateInfo()
-
-    # single stock divide helper
-    def __classifyHelper(self, plates:dict, st:Stock, ts:dict, isCare:bool):
-        if plates['status'] == 200:
-            for k in plates.keys():
-                if k != 'status':
-                    if isCare:
-                        st.addCarePlate(k)
-                    else:
-                        st.addStockPlate(k)
-                    if k in ts:
-                        ts[k].append(st.symbol)
-                    else:
-                        ts[k] = [plates[k], st.symbol]
-
-    # write crawling data into json file
-    def __jsonToFile(self, path, fileName, file):
-        with open(path + fileName, 'w', encoding="utf-8") as json_file:
-            json_file.write(file)    
 
     # stock & plates code records
     # plates struct:
@@ -99,14 +72,61 @@ class CrawlPlates:
         num = len(self.__stockSymbols)
 
         for i in range(num):
-            self.__classifyCrawlData(self.__stockSymbols[i], self.__stockNames[i], CARES_TO_STOCKS, NORMAL_TO_STOCKS, STOCKS_TO_PLATES)
-            visualTool(i, num)
+            st = Stock(self.__stockSymbols[i], self.__stockNames[i])
+            np, cp = self.__crawlOneStockData(st.symbol, st.name)
+            if np["status"] == 200:
+                for k in np.keys():
+                    if k != "status":
+                        st.addStockPlate(k)
+                        if k in NORMAL_TO_STOCKS:
+                            NORMAL_TO_STOCKS[k].append(st.symbol)
+                        else:
+                            NORMAL_TO_STOCKS[k] = [np[k], st.symbol]
+
+            if cp["status"] == 200:
+                for k in cp.keys():
+                    if k != "status":
+                        st.addCarePlate(k)
+                        if k in CARES_TO_STOCKS:
+                            CARES_TO_STOCKS[k].append(st.symbol)
+                        else:
+                            CARES_TO_STOCKS[k] = [cp[k], st.symbol]
+                        
+            STOCKS_TO_PLATES[st.symbol] = st.formatPlateInfo()
+
+            # progress visualization
+            currProgress = round(i / (num-1) * 100, 1)
+            print("\r", end="")
+            print("Progress: {}%: ".format(currProgress), "▋" * (int(currProgress) // 2), end="")
+            sys.stdout.flush()
 
         while self.__failedStocks != {}:
             currFailedStocks = self.__failedStocks
             self.__failedStocks = {}
             for (k, v) in currFailedStocks.items():
-                self.__classifyCrawlData(k, v, CARES_TO_STOCKS, NORMAL_TO_STOCKS, STOCKS_TO_PLATES)              
+                st = Stock(k, v)
+                np, cp = self.__crawlOneStockData(st.symbol, st.name)
+                if np["status"] == 200:
+                    for nk in np.keys():
+                        if nk != "status":
+                            st.addStockPlate(nk)
+                            if nk in NORMAL_TO_STOCKS:
+                                NORMAL_TO_STOCKS[nk].append(st.symbol)
+                            else:
+                                NORMAL_TO_STOCKS[nk] = [np[nk], st.symbol]
+
+                if cp["status"] == 200:
+                    for ck in cp.keys():
+                        if ck != "status":
+                            st.addCarePlate(ck)
+                            if ck in CARES_TO_STOCKS:
+                                CARES_TO_STOCKS[ck].append(st.symbol)
+                            else:
+                                CARES_TO_STOCKS[ck] = [cp[ck], st.symbol]
+                            
+                STOCKS_TO_PLATES[st.symbol] = st.formatPlateInfo()                
+
+
 
         cts = json.dumps(platesToJson(CARES_TO_STOCKS), indent=4)
         nts = json.dumps(platesToJson(NORMAL_TO_STOCKS), indent=4)
@@ -116,6 +136,11 @@ class CrawlPlates:
         if not Path(map_path).is_dir():
             os.mkdir(map_path)
 
-        self.__jsonToFile(map_path, 'CARES_TO_STOCKS.json', cts)
-        self.__jsonToFile(map_path, 'NORMAL_TO_STOCKS.json', nts)
-        self.__jsonToFile(map_path, 'STOCKS_TO_PLATES.json', stp)
+        with open(map_path + 'CARES_TO_STOCKS.json', 'w', encoding="utf-8") as json_file:
+            json_file.write(cts)
+
+        with open(map_path + 'NORMAL_TO_STOCKS.json', 'w', encoding="utf-8") as json_file:
+            json_file.write(nts)
+
+        with open(map_path + 'STOCKS_TO_PLATES.json', 'w', encoding="utf-8") as json_file:
+            json_file.write(stp)
