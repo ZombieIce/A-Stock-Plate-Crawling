@@ -23,7 +23,6 @@ def plateAPI():
                 return pt.getAllNormalPlates()
             if listName == 'stp':
                 return pt.getAllStockPlateMapping()
-        # return {'code': code, 'listName': listName, 'topStock': topStock, 'lagDay': lagDay}
 
 
 if __name__ == "__main__":

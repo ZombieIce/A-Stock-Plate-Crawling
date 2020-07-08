@@ -1,4 +1,4 @@
-from module.crawler import Crawler
+from .module import Crawler
 import requests
 import pandas as pd
 
@@ -47,12 +47,3 @@ class PlateHunter(Crawler):
         self.__form["listName"] = "stp"
         req = requests.post(self.__remote, self.__form).json()
         return req
-
-ph = PlateHunter()
-print(ph.getTopConceptPlates())
-print(ph.getTopStocksInOnePlate(885860))
-print(ph.getOnePlateData(885795, 1))
-print(ph.getOnePlateInfo(885860))
-print(ph.getAllCarePlates())
-print(ph.getAllNormalPlates())
-print(ph.getAllStockPlateMap())

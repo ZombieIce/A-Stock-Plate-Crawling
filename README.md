@@ -1,5 +1,5 @@
-## Instructions
-### This package is used to crawling stock market plates data and collect plates index data
-1. Initialize PlatesTool
-2. Use updataData method to update all stock market plates data
-3. Use getOnePlateData(code) method to get one particular plate DataFrame Minutes Data
+## Instruction
+This project contains three files.
+1. crawlplates: crawl plates data and write into back-end server data file.
+2. platehunter: client package which can fetch data from back-end server or crawl real-time data.
+3. crawl-end: small API server to offer database data.
