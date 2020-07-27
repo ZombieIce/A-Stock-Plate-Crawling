@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 from .formatUtil import formatTopStocks
 from .crawler import Crawler
+from datetime import datetime
+import tushare as ts
 
 class Plate(Crawler):
     def __init__(self):
@@ -51,13 +53,17 @@ class Plate(Crawler):
         p = self.__fileBasePath + '/plateData/'
         fileName = str(code) + ".csv"
         filePath = Path(p + fileName)
-        
-        new_df = self.crawlOnePlate(code)
-        old_df = None
 
         if filePath.is_file():
             old_df = pd.read_csv(filePath)
-            new_df = pd.concat([old_df, new_df])
+            if self.onlyHistoricalData(filePath):
+                new_df = old_df
+            else:
+                new_df = self.crawlOnePlate(code)
+                new_df = pd.concat([old_df, new_df])
+        else:
+            new_df = self.crawlOnePlate(code)
+            
 
         lagMinutes = 241 * int(lagDays)
         if lagMinutes:
@@ -65,3 +71,16 @@ class Plate(Crawler):
 
         else:
             return new_df.to_json(orient='table')
+ 
+    @staticmethod
+    def onlyHistoricalData(fileName):
+        # non trading day
+        if ts.is_holiday(datetime.strftime(datetime.now(), '%Y-%m-%d')):
+            return True
+        # after update data base in a trading day
+        elif datetime.fromtimestamp(os.path.getmtime(fileName)).date() == datetime.now().date():
+            return True
+        # before trading hour in a trading day
+        elif datetime.now() < datetime.strptime(str(datetime.now().date()) + '09:30', '%Y-%m-%d%H:%M'):
+            return True
+        return False
